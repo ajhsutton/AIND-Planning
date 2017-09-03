@@ -304,12 +304,26 @@ class PlanningGraph():
             adds A nodes to the current level in self.a_levels[level]
         """
         # TODO add action A level to the planning graph as described in the Russell-Norvig text
-        # 1. determine what actions to add and create those PgNode_a objects
+        # 1. determine what actions to add and create those PgNode_a objects        
+        pos_symbols = [s.symbol for s in self.s_levels[level] if s.is_pos]
+        neg_symbols = [s.symbol for s in self.s_levels[level] if not s.is_pos]
+        
+        self.a_levels.append(set())
+        for a in self.all_actions:
+          # Check if the pre-conditions are valid
+          pre_pos = [pre for pre in a.precond_pos if pre in pos_symbols]
+          pre_neg = [pre for pre in a.precond_neg if pre in neg_symbols]
+          
+          is_valid = (pre_pos == a.precond_pos) and (pre_neg == a.precond_neg)
+          if is_valid:
+             self.a_levels[level].add(PgNode_a(a))
+                
         # 2. connect the nodes to the previous S literal level
-        # for example, the A0 level will iterate through all possible actions for the problem and add a PgNode_a to a_levels[0]
-        #   set iff all prerequisite literals for the action hold in S0.  This can be accomplished by testing
-        #   to see if a proposed PgNode_a has prenodes that are a subset of the previous S level.  Once an
-        #   action node is added, it MUST be connected to the S node instances in the appropriate s_level set.
+        for a in self.a_levels[level]:
+          for s in self.s_levels[level]:
+            if s in a.precond_s_nodes():
+              s.children.add(a)
+              a.parents.add(s)
 
     def add_literal_level(self, level):
         """ add an S (literal) level to the Planning Graph
@@ -323,11 +337,16 @@ class PlanningGraph():
         # TODO add literal S level to the planning graph as described in the Russell-Norvig text
         # 1. determine what literals to add
         # 2. connect the nodes
-        # for example, every A node in the previous level has a list of S nodes in effnodes that represent the effect
-        #   produced by the action.  These literals will all be part of the new S level.  Since we are working with sets, they
-        #   may be "added" to the set without fear of duplication.  However, it is important to then correctly create and connect
-        #   all of the new S nodes as children of all the A nodes that could produce them, and likewise add the A nodes to the
-        #   parent sets of the S nodes
+        self.s_levels.append(set())
+        for a in self.a_levels[level-1]:
+          for s in a.effect_s_nodes():
+            if s not in self.s_levels[level]:
+              self.s_levels[level].add(s)
+              s.parents.add(a)
+              a.children.add(s)
+            else:
+              s.parents.add(a)
+              a.children.add(s)
 
     def update_a_mutex(self, nodeset):
         """ Determine and update sibling mutual exclusion for A-level nodes
